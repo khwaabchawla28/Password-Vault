@@ -23,7 +23,7 @@ One master password protects every credential you store. Uses **Argon2id** for k
 
 ```bash
 # Clone and install
-git clone https://github.com/YOUR_USERNAME/password-vault.git
+git clone https://github.com/khwaabchawla1502/password-vault.git
 cd password-vault
 chmod +x install.sh
 ./install.sh
