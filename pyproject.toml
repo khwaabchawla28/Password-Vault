@@ -30,7 +30,7 @@ qr = [
 ]
 
 [project.scripts]
-pv = "password_vault.main:app"
+vault = "password_vault.main:app"
 
 [build-system]
 requires = ["hatchling"]

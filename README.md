@@ -13,11 +13,11 @@ One master password protects every credential you store. Uses **Argon2id** for k
 - **Secure password generator** — `secrets` module with Fisher-Yates shuffle, never `random`
 - **Master password rotation** — re-encrypts the entire vault under a fresh salt and key
 - **KDF parameters stored in file** — old vaults stay readable when defaults change
-- **Clipboard integration** — `pv get github --copy` copies password to clipboard (auto-clears in 30s)
-- **Fuzzy search** — `pv search git` finds "github", "gitlab"; supports prefix, substring, and subsequence matching
+- **Clipboard integration** — `vault get github --copy` copies password to clipboard (auto-clears in 30s)
+- **Fuzzy search** — `vault search git` finds "github", "gitlab"; supports prefix, substring, and subsequence matching
 - **Browser extension** — Chrome/Firefox extension with autofill support via local API server
-- **QR code export** — `pv qr` generates a QR code of your encrypted vault for mobile transfer
-- **Pipe-friendly output** — `pv gen 32 | xclip -selection clipboard`
+- **QR code export** — `vault qr` generates a QR code of your encrypted vault for mobile transfer
+- **Pipe-friendly output** — `vault gen 32 | xclip -selection clipboard`
 
 ## Quick Start
 
@@ -29,48 +29,48 @@ chmod +x install.sh
 ./install.sh
 
 # Create a vault
-pv init
+vault init
 
 # Add credentials
-pv add github
-pv add gitlab -g   # auto-generate password
+vault add github
+vault add gitlab -g   # auto-generate password
 
 # Retrieve
-pv get github
+vault get github
 
 # Copy password to clipboard (auto-clears in 30s)
-pv get github --copy
+vault get github --copy
 
 # Fuzzy search
-pv search git      # finds github, gitlab
-pv search hub      # finds github (substring)
+vault search git      # finds github, gitlab
+vault search hub      # finds github (substring)
 
 # List all entries
-pv list
+vault list
 
 # Generate a standalone password
-pv gen 32
+vault gen 32
 
 # Rotate master password
-pv change-password
+vault change-password
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `pv init` | Create a new vault (prompts for master password) |
-| `pv add <name>` | Add a credential entry (`-g` to auto-generate password) |
-| `pv get <name>` | Show all fields for an entry |
-| `pv get <name> --copy` | Copy password to clipboard (auto-clears in 30s) |
-| `pv get <name> --copy-user` | Copy username to clipboard |
-| `pv search <query>` | Fuzzy search entries by name |
-| `pv list` | List all entry names (no passwords shown) |
-| `pv delete <name>` | Remove an entry |
-| `pv change-password` | Rotate master password, re-encrypt vault |
-| `pv gen [length]` | Generate a random password (no vault needed) |
-| `pv qr` | Export encrypted vault as QR code for mobile |
-| `pv serve` | Start local API server for browser extension |
+| `vault init` | Create a new vault (prompts for master password) |
+| `vault add <name>` | Add a credential entry (`-g` to auto-generate password) |
+| `vault get <name>` | Show all fields for an entry |
+| `vault get <name> --copy` | Copy password to clipboard (auto-clears in 30s) |
+| `vault get <name> --copy-user` | Copy username to clipboard |
+| `vault search <query>` | Fuzzy search entries by name |
+| `vault list` | List all entry names (no passwords shown) |
+| `vault delete <name>` | Remove an entry |
+| `vault change-password` | Rotate master password, re-encrypt vault |
+| `vault gen [length]` | Generate a random password (no vault needed) |
+| `vault qr` | Export encrypted vault as QR code for mobile |
+| `vault serve` | Start local API server for browser extension |
 
 Every command accepts `--vault PATH` to use a custom vault location.
 
@@ -80,13 +80,13 @@ Copy passwords directly to clipboard without displaying them:
 
 ```bash
 # Copy password (auto-clears after 30 seconds)
-pv get github --copy
+vault get github --copy
 
 # Copy username
-pv get github --copy-user
+vault get github --copy-user
 
 # Generate and copy
-pv gen 32 | xclip -selection clipboard
+vault gen 32 | xclip -selection clipboard
 ```
 
 Supports: xclip, xsel, wl-copy (Wayland), pbcopy (macOS), clip (Windows).
@@ -96,12 +96,12 @@ Supports: xclip, xsel, wl-copy (Wayland), pbcopy (macOS), clip (Windows).
 Find entries without typing the exact name:
 
 ```bash
-pv search git       # Prefix: matches github, gitlab
-pv search hub       # Substring: matches github
-pv search ghb       # Fuzzy: matches github (subsequence)
+vault search git       # Prefix: matches github, gitlab
+vault search hub       # Substring: matches github
+vault search ghb       # Fuzzy: matches github (subsequence)
 ```
 
-The `get` and `delete` commands also use fuzzy matching — `pv get git` will find "github".
+The `get` and `delete` commands also use fuzzy matching — `vault get git` will find "github".
 
 ## Browser Extension
 
@@ -109,7 +109,7 @@ Autofill credentials on any website:
 
 ```bash
 # 1. Start the local API server
-pv serve
+vault serve
 
 # 2. Load the extension in Chrome:
 #    - Go to chrome://extensions
@@ -129,10 +129,10 @@ Transfer your vault to a mobile device:
 
 ```bash
 # Export full vault as QR code
-pv qr
+vault qr
 
 # Custom output path
-pv qr --output ~/vault_backup.png
+vault qr --output ~/vault_backup.png
 ```
 
 The QR contains your encrypted vault — still protected by the master password.
