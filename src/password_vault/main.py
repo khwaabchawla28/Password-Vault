@@ -6,11 +6,14 @@ CLI entry point — wires user input to vault operations.
 Commands:
   init             Create a new empty vault
   add <name>       Add a credential entry
-  get <name>       Show an entry's details
+  get <name>       Show an entry's details (with --copy for clipboard)
+  search <query>   Fuzzy search entries by name
   list             List all entry names
   delete <name>    Remove an entry
   change-password  Rotate the master password
   gen [length]     Generate a random password (no vault needed)
+  qr               Export vault as QR code for mobile transfer
+  serve            Start local API server for browser extension
 
 Master password is NEVER accepted as a CLI flag — it would leak into
 shell history and process listings. All prompts use getpass.getpass()
@@ -54,6 +57,7 @@ from password_vault.constants import (
 )
 from password_vault.crypto import WrongPasswordError
 from password_vault.generator import PasswordTooShortError, generate_password
+from password_vault.search import fuzzy_search
 from password_vault.vault import (
     Entry,
     EntryAlreadyExistsError,
@@ -185,19 +189,59 @@ def add(
 @app.command("get")
 def get_entry(
     name: Annotated[str, typer.Argument(help="Entry name to retrieve.")],
+    copy: Annotated[
+        bool,
+        typer.Option("--copy", "-c", help="Copy password to clipboard."),
+    ] = False,
+    copy_user: Annotated[
+        bool,
+        typer.Option("--copy-user", help="Copy username to clipboard."),
+    ] = False,
     vault: Annotated[
         Optional[Path],
         typer.Option("--vault", help="Path to vault file."),
     ] = None,
 ) -> None:
-    """Show all fields for a credential entry."""
+    """Show all fields for a credential entry. Use --copy for clipboard."""
     path = _vault_path(vault)
     pw = _prompt_master()
 
     try:
         with UnlockedVault.unlock(path, pw) as v:
-            entry = v.get_entry(name)
+            # Fuzzy search — find best match
+            entries = v.list_entries()
+            matches = fuzzy_search(name, entries)
 
+            if not matches:
+                _error(MSG_ENTRY_NOT_FOUND.format(name=name))
+
+            best = matches[0]
+            entry = v.get_entry(best.name)
+
+            # Show match info if fuzzy
+            if best.match_type != "exact":
+                console.print(
+                    f"[dim]Matched '{best.name}' ({best.match_type} match)[/dim]"
+                )
+
+            # Clipboard mode
+            if copy or copy_user:
+                from password_vault.clipboard import ClipboardError, copy_to_clipboard
+
+                target = entry.password if copy else entry.username
+                field_name = "password" if copy else "username"
+
+                try:
+                    copy_to_clipboard(target)
+                    printer.print(
+                        f"[green]{field_name.capitalize()} copied to clipboard "
+                        f"(auto-clears in 30s)[/green]"
+                    )
+                except ClipboardError as e:
+                    _error(str(e))
+                return
+
+            # Display mode
             lines = [
                 f"[bold]username[/bold]    {entry.username}",
                 f"[bold]password[/bold]    {entry.password}",
@@ -212,15 +256,57 @@ def get_entry(
             printer.print(
                 Panel(
                     "\n".join(lines),
-                    title=f"[cyan]{name}[/cyan]",
+                    title=f"[cyan]{best.name}[/cyan]",
                     border_style="cyan",
                 )
             )
 
     except (VaultNotFoundError, WrongPasswordError):
         _error(MSG_VAULT_NOT_FOUND if not path.exists() else MSG_WRONG_MASTER_PASSWORD)
-    except EntryNotFoundError:
-        _error(MSG_ENTRY_NOT_FOUND.format(name=name))
+    except VaultFormatError as e:
+        _error(str(e))
+
+
+@app.command("search")
+def search_entries(
+    query: Annotated[str, typer.Argument(help="Search term (fuzzy matching).")],
+    vault: Annotated[
+        Optional[Path],
+        typer.Option("--vault", help="Path to vault file."),
+    ] = None,
+) -> None:
+    """Search entries by name with fuzzy matching.
+
+    Supports exact, prefix, substring, and subsequence matching.
+    Examples:
+      pv search git        -> github, gitlab (prefix)
+      pv search hub        -> github (substring)
+      pv search ghb        -> github (fuzzy subsequence)
+    """
+    path = _vault_path(vault)
+    pw = _prompt_master()
+
+    try:
+        with UnlockedVault.unlock(path, pw) as v:
+            entries = v.list_entries()
+            matches = fuzzy_search(query, entries)
+
+            if not matches:
+                printer.print(f"[yellow]No entries matching '{query}'[/yellow]")
+                return
+
+            table = Table(title=f"Search: '{query}'", show_lines=True)
+            table.add_column("#", style="dim", width=4)
+            table.add_column("Name", style="cyan")
+            table.add_column("Match", style="green")
+
+            for i, match in enumerate(matches, 1):
+                table.add_row(str(i), match.name, match.match_type)
+
+            printer.print(table)
+
+    except (VaultNotFoundError, WrongPasswordError):
+        _error(MSG_VAULT_NOT_FOUND if not path.exists() else MSG_WRONG_MASTER_PASSWORD)
     except VaultFormatError as e:
         _error(str(e))
 
@@ -273,16 +359,27 @@ def delete_entry(
 
     try:
         with UnlockedVault.unlock(path, pw) as v:
-            v.delete_entry(name)
+            # Fuzzy search for delete too
+            entries = v.list_entries()
+            matches = fuzzy_search(name, entries)
+
+            if not matches:
+                _error(MSG_ENTRY_NOT_FOUND.format(name=name))
+
+            best = matches[0]
+            if best.match_type != "exact":
+                console.print(
+                    f"[dim]Matched '{best.name}' ({best.match_type} match)[/dim]"
+                )
+
+            v.delete_entry(best.name)
             v.save()
             printer.print(
-                f"[yellow]{MSG_ENTRY_DELETED.format(name=name)}[/yellow]"
+                f"[yellow]{MSG_ENTRY_DELETED.format(name=best.name)}[/yellow]"
             )
 
     except (VaultNotFoundError, WrongPasswordError):
         _error(MSG_VAULT_NOT_FOUND if not path.exists() else MSG_WRONG_MASTER_PASSWORD)
-    except EntryNotFoundError:
-        _error(MSG_ENTRY_NOT_FOUND.format(name=name))
     except VaultFormatError as e:
         _error(str(e))
 
@@ -351,7 +448,93 @@ def gen(
             use_symbols=not no_symbols,
             use_digits=not no_digits,
         )
-        # Print to stdout (pipe-friendly) — not through rich
         print(password)
     except PasswordTooShortError as e:
         _error(str(e))
+
+
+@app.command("qr")
+def qr_export(
+    entry: Annotated[
+        Optional[str],
+        typer.Argument(help="Entry name to export (optional, exports full vault)."),
+    ] = None,
+    output: Annotated[
+        Optional[Path],
+        typer.Option("--output", "-o", help="Output image path."),
+    ] = None,
+    vault: Annotated[
+        Optional[Path],
+        typer.Option("--vault", help="Path to vault file."),
+    ] = None,
+) -> None:
+    """Export vault as a QR code for mobile transfer.
+
+    The QR contains the encrypted vault data — still protected by
+    your master password. Scan with a compatible mobile app.
+
+    For a single entry: pv qr github
+    For full vault:     pv qr
+    """
+    from password_vault.qr_export import QRExportError, export_vault_qr
+
+    path = _vault_path(vault)
+
+    if not path.exists():
+        _error(MSG_VAULT_NOT_FOUND)
+
+    try:
+        out_path = export_vault_qr(path, output_path=output)
+        printer.print(
+            Panel(
+                f"QR code saved to: {out_path}\n\n"
+                f"The QR contains your encrypted vault.\n"
+                f"You still need the master password to decrypt it.",
+                title="[green]QR Export[/green]",
+                border_style="green",
+            )
+        )
+    except QRExportError as e:
+        _error(str(e))
+
+
+@app.command("serve")
+def serve(
+    vault: Annotated[
+        Optional[Path],
+        typer.Option("--vault", help="Path to vault file."),
+    ] = None,
+    port: Annotated[
+        int,
+        typer.Option("--port", "-p", help="API server port."),
+    ] = 19815,
+) -> None:
+    """Start local API server for the browser extension.
+
+    The server runs on localhost only and requires the master password
+    from the browser extension to decrypt the vault. No data is sent
+    over the network.
+
+    Install the browser extension from: browser-extension/
+    """
+    from password_vault.api_server import run_server
+
+    path = _vault_path(vault)
+
+    if not path.exists():
+        _error(MSG_VAULT_NOT_FOUND)
+
+    printer.print(
+        Panel(
+            f"Starting vault API server...\n\n"
+            f"Vault: {path}\n"
+            f"Port:  {port}\n"
+            f"URL:   http://127.0.0.1:{port}\n\n"
+            f"The server only accepts connections from localhost.\n"
+            f"Install the browser extension from: browser-extension/",
+            title="[cyan]Vault Server[/cyan]",
+            border_style="cyan",
+        )
+    )
+
+    run_server(path, port=port)

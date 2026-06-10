@@ -25,6 +25,9 @@ dev = [
     "pylint>=3.3.0",
     "yapf>=0.43.0",
 ]
+qr = [
+    "qrcode[pil]>=7.0",
+]
 
 [project.scripts]
 pv = "password_vault.main:app"
