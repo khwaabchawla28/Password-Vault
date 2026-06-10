@@ -12,6 +12,8 @@ warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error()   { echo -e "${RED}[ERROR]${NC} $1" >&2; }
 success() { echo -e "${GREEN}[OK]${NC} $1"; }
 
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Step 1 — Check Python 3.13+
 check_python() {
     info "Checking for Python 3.13+..."
@@ -66,8 +68,34 @@ install_just() {
 # Step 4 — Create venv and install deps
 setup_project() {
     info "Setting up project..."
+    cd "$PROJECT_DIR"
     just setup
     success "Project setup complete"
+}
+
+# Step 5 — Create global 'vault' command
+install_vault_command() {
+    info "Installing 'vault' command globally..."
+
+    mkdir -p ~/.local/bin
+
+    cat > ~/.local/bin/vault << WRAPPER
+#!/usr/bin/env bash
+cd "$PROJECT_DIR" && source .venv/bin/activate && vault "\$@"
+WRAPPER
+    chmod +x ~/.local/bin/vault
+
+    # Make sure ~/.local/bin is in PATH
+    if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
+        # Add to .bashrc if not already there
+        if ! grep -q '.local/bin' ~/.bashrc 2>/dev/null; then
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+            info "Added ~/.local/bin to PATH in ~/.bashrc"
+        fi
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
+
+    success "'vault' command installed"
 }
 
 # Run everything
@@ -75,17 +103,23 @@ check_python
 install_uv
 install_just
 setup_project
+install_vault_command
 
 echo ""
 echo -e "${GREEN}============================================${NC}"
 echo -e "${GREEN}  password-vault is ready!${NC}"
 echo -e "${GREEN}============================================${NC}"
 echo ""
-echo "  Try it out:"
-echo "    just run -- init          Create a vault"
-echo "    just run -- add github    Add an entry"
-echo "    just run -- get github    Retrieve it"
-echo "    just run -- gen 32        Generate a password"
+echo "  Open a NEW terminal and try:"
+echo "    vault init              Create a vault"
+echo "    vault add github        Add an entry"
+echo "    vault get github        Retrieve it"
+echo "    vault gen 32            Generate a password"
+echo ""
+echo "  Or use 'just run' in this terminal:"
+echo "    just run -- init"
+echo "    just run -- add github"
+echo "    just run -- get github"
 echo ""
 echo "  Run tests:"
 echo "    just test"
