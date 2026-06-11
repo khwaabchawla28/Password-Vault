@@ -14,26 +14,45 @@ success() { echo -e "${GREEN}[OK]${NC} $1"; }
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Step 1 — Check Python 3.13+
+# Step 1 — Check Python 3.13+ (install via uv if missing)
 check_python() {
     info "Checking for Python 3.13+..."
-    if ! command -v python3 &>/dev/null; then
-        error "python3 not found. Install Python 3.13+ first."
-        exit 1
+
+    # First check if system python3 is already 3.13+
+    if command -v python3 &>/dev/null; then
+        local version major minor
+        version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+        major=$(echo "$version" | cut -d. -f1)
+        minor=$(echo "$version" | cut -d. -f2)
+        if (( major > 3 )) || { (( major == 3 )) && (( minor >= 13 )); }; then
+            success "Python $version detected"
+            return 0
+        fi
+        warn "Found Python $version — need 3.13+"
+    else
+        warn "python3 not found"
     fi
-    local version
-    version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    local major minor
-    major=$(echo "$version" | cut -d. -f1)
-    minor=$(echo "$version" | cut -d. -f2)
-    if (( major < 3 )) || { (( major == 3 )) && (( minor < 13 )); }; then
-        error "Python 3.13+ required, found Python $version"
-        exit 1
+
+    # Python 3.13+ not available — install it via uv
+    info "Installing Python 3.13 via uv..."
+    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+
+    # Make sure uv is available (install_uv runs after this, but we need it now)
+    if ! command -v uv &>/dev/null; then
+        info "Installing uv first..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+        if ! command -v uv &>/dev/null; then
+            error "uv install failed. Install Python 3.13+ manually and retry."
+            exit 1
+        fi
     fi
-    success "Python $version detected"
+
+    uv python install 3.13
+    success "Python 3.13 installed via uv"
 }
 
-# Step 2 — Install uv if missing
+# Step 2 — Install uv if missing (may already be installed by check_python)
 install_uv() {
     if command -v uv &>/dev/null; then
         success "uv already installed ($(uv --version))"
@@ -73,17 +92,17 @@ setup_project() {
     success "Project setup complete"
 }
 
-# Step 5 — Create global 'vault' command
-install_vault_command() {
-    info "Installing 'vault' command globally..."
+# Step 5 — Create global 'pvt' command
+install_pvt_command() {
+    info "Installing 'pvt' command globally..."
 
     mkdir -p ~/.local/bin
 
-    cat > ~/.local/bin/vault << WRAPPER
+    cat > ~/.local/bin/pvt << WRAPPER
 #!/usr/bin/env bash
-cd "$PROJECT_DIR" && source .venv/bin/activate && vault "\$@"
+cd "$PROJECT_DIR" && source .venv/bin/activate && pvt "\$@"
 WRAPPER
-    chmod +x ~/.local/bin/vault
+    chmod +x ~/.local/bin/pvt
 
     # Make sure ~/.local/bin is in PATH
     if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
@@ -95,7 +114,7 @@ WRAPPER
         export PATH="$HOME/.local/bin:$PATH"
     fi
 
-    success "'vault' command installed"
+    success "'pvt' command installed"
 }
 
 # Run everything
@@ -103,7 +122,7 @@ check_python
 install_uv
 install_just
 setup_project
-install_vault_command
+install_pvt_command
 
 echo ""
 echo -e "${GREEN}============================================${NC}"
@@ -111,10 +130,10 @@ echo -e "${GREEN}  password-vault is ready!${NC}"
 echo -e "${GREEN}============================================${NC}"
 echo ""
 echo "  Open a NEW terminal and try:"
-echo "    vault init              Create a vault"
-echo "    vault add github        Add an entry"
-echo "    vault get github        Retrieve it"
-echo "    vault gen 32            Generate a password"
+echo "    pvt init              Create a vault"
+echo "    pvt add github        Add an entry"
+echo "    pvt get github        Retrieve it"
+echo "    pvt gen 32            Generate a password"
 echo ""
 echo "  Or use 'just run' in this terminal:"
 echo "    just run -- init"

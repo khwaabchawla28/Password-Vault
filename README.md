@@ -9,15 +9,15 @@ One master password protects every credential you store. Uses **Argon2id** for k
 - **Argon2id key derivation** — OWASP-recommended, memory-hard to defeat GPU brute-force attacks
 - **AES-256-GCM authenticated encryption** — confidentiality + tamper detection in one primitive
 - **Atomic durable writes** — tmp file → fsync → atomic rename → directory fsync. Never corrupt, even on power loss
-- **Advisory file locking** — concurrent `pv` invocations are serialized via `fcntl`
+- **Advisory file locking** — concurrent `pvt` invocations are serialized via `fcntl`
 - **Secure password generator** — `secrets` module with Fisher-Yates shuffle, never `random`
 - **Master password rotation** — re-encrypts the entire vault under a fresh salt and key
 - **KDF parameters stored in file** — old vaults stay readable when defaults change
-- **Clipboard integration** — `vault get github --copy` copies password to clipboard (auto-clears in 30s)
-- **Fuzzy search** — `vault search git` finds "github", "gitlab"; supports prefix, substring, and subsequence matching
+- **Clipboard integration** — `pvt get github --copy` copies password to clipboard (auto-clears in 30s)
+- **Fuzzy search** — `pvt search git` finds "github", "gitlab"; supports prefix, substring, and subsequence matching
 - **Browser extension** — Chrome/Firefox extension with autofill support via local API server
-- **QR code export** — `vault qr` generates a QR code of your encrypted vault for mobile transfer
-- **Pipe-friendly output** — `vault gen 32 | xclip -selection clipboard`
+- **QR code export** — `pvt qr` generates a QR code of your encrypted vault for mobile transfer
+- **Pipe-friendly output** — `pvt gen 32 | xclip -selection clipboard`
 
 ## Quick Start
 
@@ -29,48 +29,48 @@ chmod +x install.sh
 ./install.sh
 
 # Create a vault
-vault init
+pvt init
 
 # Add credentials
-vault add github
-vault add gitlab -g   # auto-generate password
+pvt add github
+pvt add gitlab -g   # auto-generate password
 
 # Retrieve
-vault get github
+pvt get github
 
 # Copy password to clipboard (auto-clears in 30s)
-vault get github --copy
+pvt get github --copy
 
 # Fuzzy search
-vault search git      # finds github, gitlab
-vault search hub      # finds github (substring)
+pvt search git      # finds github, gitlab
+pvt search hub      # finds github (substring)
 
 # List all entries
-vault list
+pvt list
 
 # Generate a standalone password
-vault gen 32
+pvt gen 32
 
 # Rotate master password
-vault change-password
+pvt change-password
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `vault init` | Create a new vault (prompts for master password) |
-| `vault add <name>` | Add a credential entry (`-g` to auto-generate password) |
-| `vault get <name>` | Show all fields for an entry |
-| `vault get <name> --copy` | Copy password to clipboard (auto-clears in 30s) |
-| `vault get <name> --copy-user` | Copy username to clipboard |
-| `vault search <query>` | Fuzzy search entries by name |
-| `vault list` | List all entry names (no passwords shown) |
-| `vault delete <name>` | Remove an entry |
-| `vault change-password` | Rotate master password, re-encrypt vault |
-| `vault gen [length]` | Generate a random password (no vault needed) |
-| `vault qr` | Export encrypted vault as QR code for mobile |
-| `vault serve` | Start local API server for browser extension |
+| `pvt init` | Create a new vault (prompts for master password) |
+| `pvt add <name>` | Add a credential entry (`-g` to auto-generate password) |
+| `pvt get <name>` | Show all fields for an entry |
+| `pvt get <name> --copy` | Copy password to clipboard (auto-clears in 30s) |
+| `pvt get <name> --copy-user` | Copy username to clipboard |
+| `pvt search <query>` | Fuzzy search entries by name |
+| `pvt list` | List all entry names (no passwords shown) |
+| `pvt delete <name>` | Remove an entry |
+| `pvt change-password` | Rotate master password, re-encrypt vault |
+| `pvt gen [length]` | Generate a random password (no vault needed) |
+| `pvt qr` | Export encrypted vault as QR code for mobile |
+| `pvt serve` | Start local API server for browser extension |
 
 Every command accepts `--vault PATH` to use a custom vault location.
 
@@ -80,13 +80,13 @@ Copy passwords directly to clipboard without displaying them:
 
 ```bash
 # Copy password (auto-clears after 30 seconds)
-vault get github --copy
+pvt get github --copy
 
 # Copy username
-vault get github --copy-user
+pvt get github --copy-user
 
 # Generate and copy
-vault gen 32 | xclip -selection clipboard
+pvt gen 32 | xclip -selection clipboard
 ```
 
 Supports: xclip, xsel, wl-copy (Wayland), pbcopy (macOS), clip (Windows).
@@ -96,12 +96,12 @@ Supports: xclip, xsel, wl-copy (Wayland), pbcopy (macOS), clip (Windows).
 Find entries without typing the exact name:
 
 ```bash
-vault search git       # Prefix: matches github, gitlab
-vault search hub       # Substring: matches github
-vault search ghb       # Fuzzy: matches github (subsequence)
+pvt search git       # Prefix: matches github, gitlab
+pvt search hub       # Substring: matches github
+pvt search ghb       # Fuzzy: matches github (subsequence)
 ```
 
-The `get` and `delete` commands also use fuzzy matching — `vault get git` will find "github".
+The `get` and `delete` commands also use fuzzy matching — `pvt get git` will find "github".
 
 ## Browser Extension
 
@@ -109,7 +109,7 @@ Autofill credentials on any website:
 
 ```bash
 # 1. Start the local API server
-vault serve
+pvt serve
 
 # 2. Load the extension in Chrome:
 #    - Go to chrome://extensions
@@ -129,10 +129,10 @@ Transfer your vault to a mobile device:
 
 ```bash
 # Export full vault as QR code
-vault qr
+pvt qr
 
 # Custom output path
-vault qr --output ~/vault_backup.png
+pvt qr --output ~/vault_backup.png
 ```
 
 The QR contains your encrypted vault — still protected by the master password.
@@ -154,7 +154,7 @@ The QR contains your encrypted vault — still protected by the master password.
 ## Project Structure
 
 ```
-password-vault/
+Password-Vault/
 ├── pyproject.toml
 ├── justfile
 ├── install.sh
@@ -197,7 +197,7 @@ just format     # Auto-format with yapf
 
 ## Tech Stack
 
-- **Python 3.13+**
+- **Python 3.13+** (auto-installed by `install.sh` if missing)
 - **argon2-cffi** — Argon2id key derivation
 - **cryptography** — AES-256-GCM encryption
 - **typer** — CLI framework

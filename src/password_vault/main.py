@@ -70,7 +70,7 @@ from password_vault.vault import (
 )
 
 app = typer.Typer(
-    name="pv",
+    name="pvt",
     help="Encrypted password vault — one master password protects everything.",
     add_completion=False,
 )
@@ -279,9 +279,9 @@ def search_entries(
 
     Supports exact, prefix, substring, and subsequence matching.
     Examples:
-      pv search git        -> github, gitlab (prefix)
-      pv search hub        -> github (substring)
-      pv search ghb        -> github (fuzzy subsequence)
+      pvt search git        -> github, gitlab (prefix)
+      pvt search hub        -> github (substring)
+      pvt search ghb        -> github (fuzzy subsequence)
     """
     path = _vault_path(vault)
     pw = _prompt_master()
@@ -473,8 +473,8 @@ def qr_export(
     The QR contains the encrypted vault data — still protected by
     your master password. Scan with a compatible mobile app.
 
-    For a single entry: pv qr github
-    For full vault:     pv qr
+    For a single entry: pvt qr github
+    For full vault:     pvt qr
     """
     from password_vault.qr_export import QRExportError, export_vault_qr
 

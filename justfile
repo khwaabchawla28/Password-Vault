@@ -71,4 +71,4 @@ run *args:
     EOF
         exit 0
     fi
-    uv run vault "$@"
+    uv run pvt "$@"
